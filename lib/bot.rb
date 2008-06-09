@@ -42,7 +42,9 @@ class Bot
   end
 
   def handle_presence(pres)
+    return if pres.type == :error
     return if pres.from.bare == @client.jid.bare
+
     case pres.type
     when :subscribe
       logger.info "Got a subscription request from #{pres.from}"
@@ -62,8 +64,10 @@ class Bot
   end
 
   def handle_message(msg)
-    logger.debug "Handling message: #{msg.inspect}"
+    return if msg.type == :error
     return if msg.body.nil?
+
+    logger.debug "Handling message: #{msg.inspect}"
     case access_for(msg.from)
     when :admin
       case msg.body
