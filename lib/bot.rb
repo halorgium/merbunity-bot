@@ -8,20 +8,15 @@ require 'xmpp4r/roster'
 
 $:.unshift File.dirname(__FILE__)
 
-Jabber.debug = true
-
 class Bot
   def self.logger
     @logger ||= Logger.new($stderr)
   end
   def logger; self.class.logger; end
 
-  def initialize(config_filename)
-    @config_filename = config_filename
-  end
-  attr_reader :config_filename
-
   def start
+    ::Jabber.debug = !!config["debug"]
+
     @client = Jabber::Client.new(config["jid"])
     @client.on_exception do |*a|
       logger.error "Got a client exception: #{a.inspect}"
@@ -45,7 +40,6 @@ class Bot
     @roster ||= Jabber::Roster::Helper.new(@client)
   end
 
-
   def handle_presence(pres)
     return if pres.from.bare == @client.jid.bare
     case pres.type
@@ -68,7 +62,22 @@ class Bot
     logger.debug "Handling message: #{msg.inspect}"
     return if msg.body.nil?
     return unless controlling_jid?(msg.from)
-    parse_command(msg.from, msg.body)
+
+    case msg.body
+    when "ping"
+      logger.info "ping from #{msg.from}"
+      reply = Jabber::Message.new(msg.from, "pong")
+      @client.send(reply)
+    when "who"
+      logger.info "who request from #{msg.from}"
+      watchers = online_watchers
+      body = "#{watchers.size} jids online: "
+      body << watchers.join(", ")
+      reply = Jabber::Message.new(msg.from, body)
+      @client.send(reply)
+    else
+      parse_command(msg.from, msg.body)
+    end
   end
 
   def parse_command(from, command_string)
@@ -100,13 +109,13 @@ class Bot
   end
 
   def config
-    @config ||= YAML.load_file(config_filename)
+    @config ||= YAML.load_file(File.dirname(__FILE__) + '/../data/config.yml')
   end
 end
 
 begin
   Bot.logger.debug "Starting on #{$$}"
-  b = Bot.new(ARGV.first)
+  b = Bot.new
   b.start
 rescue Exception => e
   Bot.logger.error "Caught exception: #{e.class}, #{e.message}"
