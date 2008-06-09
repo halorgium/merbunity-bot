@@ -71,6 +71,11 @@ class Bot
         logger.info "ping from #{msg.from}"
         reply = Jabber::Message.new(msg.from, "pong")
         @client.send(reply)
+      when "reload"
+        logger.info "reload from #{msg.from}"
+        @config = nil
+        reply = Jabber::Message.new(msg.from, "Reloaded...")
+        @client.send(reply)
       when "who"
         logger.info "who request from #{msg.from}"
         watchers = online_watchers
