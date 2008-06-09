@@ -9,6 +9,7 @@ options = {
   :ARGV       => ARGV,
   :dir_mode   => :normal,
   :dir        => File.dirname(__FILE__) + '/../data',
+  :log_output => true,
   :multiple   => false,
   :backtrace  => true,
   :monitor    => false
