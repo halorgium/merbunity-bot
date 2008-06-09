@@ -47,11 +47,13 @@ class Bot
     when :subscribe
       logger.info "Got a subscription request from #{pres.from}"
       @roster.accept_subscription(pres.from)
+      alert_admins("#{pres.from} subscribed")
     when :unsubscribe
       logger.info "Got an unsubscription request from #{pres.from}"
       Thread.new {
         if @roster[pres.from].remove
           logger.info "#{pres.from} removed from the roster"
+          alert_admins("#{pres.from} unsubscribed")
         else
           logger.warn "#{pres.from} not removed from the roster"
         end
@@ -62,21 +64,26 @@ class Bot
   def handle_message(msg)
     logger.debug "Handling message: #{msg.inspect}"
     return if msg.body.nil?
-    return unless controlling_jid?(msg.from)
-
-    case msg.body
-    when "ping"
-      logger.info "ping from #{msg.from}"
-      reply = Jabber::Message.new(msg.from, "pong")
-      @client.send(reply)
-    when "who"
-      logger.info "who request from #{msg.from}"
-      watchers = online_watchers
-      body = "#{watchers.size} jids online: "
-      body << watchers.join(", ")
-      reply = Jabber::Message.new(msg.from, body)
-      @client.send(reply)
-    else
+    case access_for(msg.from)
+    when :admin
+      case msg.body
+      when "ping"
+        logger.info "ping from #{msg.from}"
+        reply = Jabber::Message.new(msg.from, "pong")
+        @client.send(reply)
+      when "who"
+        logger.info "who request from #{msg.from}"
+        watchers = online_watchers
+        body = "#{watchers.size} jids online: "
+        body << watchers.join(", ")
+        reply = Jabber::Message.new(msg.from, body)
+        @client.send(reply)
+      else
+        logger.info "unknown message #{msg.body.inspect} from #{msg.from}"
+        reply = Jabber::Message.new(msg.from, "what?")
+        @client.send(reply)
+      end
+    when :controller
       parse_command(msg.from, msg.body)
     end
   end
@@ -84,11 +91,12 @@ class Bot
   def parse_command(from, command_string)
     command = JSON.parse(command_string)
     rcpts = command["rcpts"] || online_watchers
+    body = command["body"]
 
-    logger.info "#{from} delivered #{command["body"]} to #{rcpts.inspect}"
+    logger.info "#{from} delivered #{body.inspect} to #{rcpts.inspect}"
 
     rcpts.each do |rcpt|
-      msg = Jabber::Message.new(rcpt, command["body"])
+      msg = Jabber::Message.new(rcpt, body)
       msg.type = :chat
       @client.send(msg)
     end
@@ -104,9 +112,29 @@ class Bot
     watchers
   end
 
-  def controlling_jid?(jid)
-    logger.debug "Checking if #{jid} is a controller"
-    config["controllers"].include?(jid.bare.to_s)
+  def access_for(jid)
+    logger.debug "Checking access for #{jid}"
+    if admins.include?(jid.bare.to_s)
+      :admin
+    elsif controllers.include?(jid.bare.to_s)
+      :controller
+    end
+  end
+
+  def alert_admins(body)
+    admins.each do |rcpt|
+      msg = Jabber::Message.new(rcpt, body)
+      msg.type = :chat
+      @client.send(msg)
+    end
+  end
+
+  def admins
+    config["admins"] || []
+  end
+
+  def controllers
+    config["controllers"] || []
   end
 
   def config
