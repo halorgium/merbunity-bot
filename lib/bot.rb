@@ -20,6 +20,7 @@ class Bot
     @client = Jabber::Client.new(config["jid"])
     @client.on_exception do |*a|
       logger.error "Got a client exception: #{a.inspect}"
+      sleep 10
       connect
     end
     @client.add_presence_callback do |p|
