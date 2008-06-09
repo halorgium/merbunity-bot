@@ -1,0 +1,4 @@
+jid: user@domain/resource
+pass: zomg
+controllers:
+- admin@domain
