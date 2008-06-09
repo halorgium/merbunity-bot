@@ -84,7 +84,7 @@ class Bot
     command = JSON.parse(command_string)
     rcpts = command["rcpts"] || online_watchers
 
-    logger.info "Delivering #{command["body"]} to #{rcpts.inspect}"
+    logger.info "#{from} delivered #{command["body"]} to #{rcpts.inspect}"
 
     rcpts.each do |rcpt|
       msg = Jabber::Message.new(rcpt, command["body"])
@@ -98,13 +98,13 @@ class Bot
   def online_watchers
     watchers = []
     @roster.items.each do |jid,item|
-      watchers << jid if item.online?
+      watchers << jid.bare.to_s if item.online?
     end
     watchers
   end
 
   def controlling_jid?(jid)
-    logger.debug "Checking if #{jid.bare} is a controller"
+    logger.debug "Checking if #{jid} is a controller"
     config["controllers"].include?(jid.bare.to_s)
   end
 
